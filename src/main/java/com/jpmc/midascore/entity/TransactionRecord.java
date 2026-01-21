@@ -20,6 +20,7 @@ public class TransactionRecord { //Audit Trail
     @Column(nullable = false)
     private float amount;
 
+    private float incentive;
     protected TransactionRecord(){
     }
     public TransactionRecord(
@@ -41,5 +42,12 @@ public class TransactionRecord { //Audit Trail
     }
     public float getAmount() {
         return amount;
+    }
+    public void setIncentive(float incentive){
+        this.incentive= incentive;
+    }
+
+    public float getIncentive() {
+        return incentive;
     }
 }

@@ -9,8 +9,9 @@ import com.jpmc.midascore.entity.UserRecord;
 import com.jpmc.midascore.foundation.Transaction;
 import com.jpmc.midascore.repository.TransactionRecordRepository;
 import com.jpmc.midascore.repository.UserRepository;
-
 import jakarta.transaction.Transactional;
+import com.jpmc.midascore.entity.Incentive;
+import org.springframework.web.client.RestTemplate;
 
 @Service
 public class TransactionProcessor {
@@ -19,17 +20,19 @@ public class TransactionProcessor {
 
     private final UserRepository userRepository;
     private final TransactionRecordRepository transactionRecordRepository;  
-
+    private final RestTemplate restTemplate;
     public TransactionProcessor(
         UserRepository userRepository,
-        TransactionRecordRepository transactionRecordRepository) {
+      TransactionRecordRepository transactionRecordRepository,
+      RestTemplate restTemplate) {
             this.userRepository = userRepository;
             this.transactionRecordRepository = transactionRecordRepository;
+        this.restTemplate = restTemplate;
     }
 
     @Transactional
     public boolean process(Transaction transaction) {
-        // Implementation goes here
+     //call Ince
      if(transaction==null)   return false;
      long senderId=transaction.getSenderId();
      long recipientId=transaction.getRecipientId();
@@ -46,17 +49,26 @@ public class TransactionProcessor {
       logger.debug("Insufficient balance");
       return false;
     }
-    sender.setBalance(sender.getBalance()-amount);
-    recipient.setBalance(recipient.getBalance()+amount);
-    userRepository.save(sender);
-    userRepository.save(recipient); 
-
-    //persist transaction record
-    TransactionRecord record = new TransactionRecord(
-        sender,
-        recipient,
-        amount
+    // Call incentive API
+    Incentive incentive = restTemplate.postForObject(
+        "http://localhost:8080/incentive",
+        transaction,
+        Incentive.class
     );
+
+    float incentiveAmount = incentive.getAmount();
+
+    // Update balances
+    sender.setBalance(sender.getBalance() - amount);
+    recipient.setBalance(recipient.getBalance() + amount + incentiveAmount);
+
+    // Save and persist
+    userRepository.save(sender);
+    userRepository.save(recipient);
+
+    // Create transaction record with incentive
+    TransactionRecord record = new TransactionRecord(sender, recipient, amount);
+    record.setIncentive(incentiveAmount);
     transactionRecordRepository.save(record);
     logger.debug("Proceeeds:{}->{} amount {}",senderId,recipientId,amount);
     return true;
